@@ -184,6 +184,21 @@ void sendFile(ReliableConnection* connection)
 
 	printf("Sending file: %s (%ld bytes)\n", filename, fileSize);
 
+	char buffer[PACKET_SIZE];
+	size_t bytesRead;
+	while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0)
+	{
+		unsigned char contentPacket[PACKET_SIZE + 1];
+		contentPacket[0] = 0x03; 
+		for (size_t i = 0; i < bytesRead; i++)
+		{
+			contentPacket[i + 1] = (unsigned char)buffer[i];
+		}
+		connection->SendPacket(contentPacket, bytesRead + 1);
+	}
+	fclose(file);
+
+
 	return;
 }
 
@@ -248,6 +263,15 @@ void receiveFile(ReliableConnection* connection)
 			}
 			printf("Receiving file: %s (%lu bytes)\n", filename, expectedFileSize);
 			receiving = true;
+		}
+		else if (packet[0] == 0x03)
+		{
+			if (receiving && file) 
+			{
+				fwrite(packet + 1, 1, bytesRead - 1, file);
+				receivedFileSize += bytesRead - 1;
+			}
+
 		}
 	}
 	return;
