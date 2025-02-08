@@ -197,7 +197,11 @@ void sendFile(ReliableConnection* connection)
 		connection->SendPacket(contentPacket, bytesRead + 1);
 	}
 	fclose(file);
+	
+	unsigned char eofPacket[1] = { 0x04 };
+	connection->SendPacket(eofPacket, sizeof(eofPacket));
 
+	printf("File transmission completed!\n");
 
 	return;
 }
@@ -272,6 +276,12 @@ void receiveFile(ReliableConnection* connection)
 				receivedFileSize += bytesRead - 1;
 			}
 
+		}
+		else if (packet[0] == 0x04)
+		{
+			if (file) fclose(file);
+			printf("End of file received.\n");
+			break;
 		}
 	}
 	return;
