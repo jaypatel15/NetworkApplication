@@ -132,6 +132,10 @@ void sendFile(ReliableConnection* connection)
 		return;
 	}
 
+	fseek(file, 0, SEEK_END);
+	long fileSize = ftell(file);
+	rewind(file);
+
 	char* filename = filePath;
 	char* slash = NULL;
 
@@ -162,6 +166,23 @@ void sendFile(ReliableConnection* connection)
 	}
 
 	connection->SendPacket(filenamePacket, filenameLength + 1);
+
+	unsigned char sizePacket[9];
+	sizePacket[0] = 0x02; 
+	unsigned char* sizePtr = (unsigned char*)&fileSize;
+	for (size_t i = 0; i < sizeof(fileSize); i++) 
+	{
+		sizePacket[i + 1] = sizePtr[i];
+	}
+
+	connection->SendPacket(sizePacket, sizeof(sizePacket));
+
+	unsigned char modePacket[2];
+	modePacket[0] = 0x05; 
+	modePacket[1] = 1;
+	connection->SendPacket(modePacket, sizeof(modePacket));
+
+	printf("Sending file: %s (%ld bytes)\n", filename, fileSize);
 
 	return;
 }
@@ -195,6 +216,38 @@ void receiveFile(ReliableConnection* connection)
 			filename[dataLength] = '\0';
 
 			printf("Received filename: %s (Length: %d)\n", filename, bytesRead - 1);
+
+			for (uint32_t i = 0; i < bytesRead - 1; i++)
+			{
+				if (filename[i] < 32 || filename[i] > 126) filename[i] = '_';
+			}
+		}
+		else if (packet[0] == 0x02) 
+		{ 
+			expectedFileSize = 0;
+			int copyBytes = sizeof(expectedFileSize);
+			if (bytesRead - 1 < copyBytes)
+				copyBytes = bytesRead - 1;
+			unsigned char* sizePtr = (unsigned char*)&expectedFileSize;
+			for (int i = 0; i < copyBytes; i++)
+			{
+				sizePtr[i] = packet[i + 1];
+			}
+
+		}
+		else if (packet[0] == 0x05) 
+		{ 
+			fileMode = packet[1];
+
+			const char* openMode = (fileMode == 1) ? "wb" : "w";
+			file = fopen(filename, openMode);
+			if (!file)
+			{
+				printf("Error: Unable to create the file: %s\n", filename);
+				return;
+			}
+			printf("Receiving file: %s (%lu bytes)\n", filename, expectedFileSize);
+			receiving = true;
 		}
 	}
 	return;
