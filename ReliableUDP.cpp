@@ -11,7 +11,7 @@
 
 // Adding file header in the "ReliableUDP.cpp" file as #include "Net.h"
 #include "Net.h"
-
+#define PACKET_SIZE 256
 //#define SHOW_ACKS
 
 using namespace std;
@@ -132,12 +132,71 @@ void sendFile(ReliableConnection* connection)
 		return;
 	}
 
+	char* filename = filePath;
+	char* slash = NULL;
+
+	for (char* p = filePath; *p != '\0'; p++) 
+	{
+		if (*p == '/' || *p == '\\') {
+			slash = p;
+		}
+	}
+	if (slash) 
+	{
+		filename = slash + 1;
+	}
+
+	uint32_t filenameLength = 0;
+	while (filename[filenameLength] != '\0') 
+	{
+		filenameLength++;
+	}
+
+	printf("Sending filename: %s (Length: %d)\n", filename, filenameLength);
+
+	unsigned char filenamePacket[256];
+	filenamePacket[0] = 0x01;
+	for (uint32_t i = 0; i < filenameLength; i++) 
+	{
+		filenamePacket[i + 1] = filename[i];
+	}
+
+	connection->SendPacket(filenamePacket, filenameLength + 1);
+
 	return;
 }
 
 void receiveFile(ReliableConnection* connection) 
 {
+	if (!connection->IsConnected()) return;
 
+	char filename[256] = { 0 };
+	FILE* file = nullptr;
+	uint64_t expectedFileSize = 0, receivedFileSize = 0;
+	bool receiving = false;
+	unsigned char fileMode = 1;
+
+	while (true) 
+	{
+		unsigned char packet[PACKET_SIZE] = { 0 };
+		int bytesRead = connection->ReceivePacket(packet, PACKET_SIZE);
+
+		if (bytesRead <= 0) continue;
+
+		if (packet[0] == 0x01) {
+			int dataLength = bytesRead - 1;
+
+			if (dataLength > 255)
+				dataLength = 255;
+			for (int i = 0; i < dataLength; i++) {
+				filename[i] = (char)packet[i + 1];
+			}
+
+			filename[dataLength] = '\0';
+
+			printf("Received filename: %s (Length: %d)\n", filename, bytesRead - 1);
+		}
+	}
 	return;
 }
 
