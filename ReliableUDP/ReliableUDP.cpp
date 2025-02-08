@@ -20,7 +20,7 @@ using namespace net;
 const int ServerPort = 30000;
 const int ClientPort = 30001;
 const int ProtocolId = 0x11223344;
-const float DeltaTime = 1.0f / 30.0f;
+const float DeltaTime = 1.0f / 30.0f; 
 const float SendRate = 1.0f / 30.0f;
 const float TimeOut = 10.0f;
 const int PacketSize = 256;
@@ -117,6 +117,32 @@ private:
 
 // ----------------------------------------------
 
+void sendFile(ReliableConnection* connection) 
+{
+	char filePath[256];
+	printf("Enter the filename to send: ");
+	scanf("%255s", filePath);
+
+	const char* openMode = "rb";
+
+	FILE* file = fopen(filePath, openMode);
+	if (!file) 
+	{
+		perror("Error: Unable to open the file for sending");
+		return;
+	}
+
+	return;
+}
+
+void receiveFile(ReliableConnection* connection) 
+{
+
+	return;
+}
+
+// ----------------------------------------------
+
 int main(int argc, char* argv[])
 {
 	// parse command line
@@ -198,6 +224,16 @@ int main(int argc, char* argv[])
 		{
 			printf("connection failed\n");
 			break;
+		}
+
+		if (mode == Client) 
+		{
+			sendFile(&connection);
+		}
+
+		if (mode == Server) 
+		{
+			receiveFile(&connection);
 		}
 
 		// send and receive packets
