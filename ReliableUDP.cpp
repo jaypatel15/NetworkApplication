@@ -1,4 +1,11 @@
 /*
+	Name        : Jay Patel  (8888384)
+                  Helly Shah (8958841)
+	Project Name: ReliableUDP.cpp
+	Date        : 08th Febuary,2025
+	Description : This program implements reliable client-server communication with flow control, error detection, and transmission speed measurement.
+*/
+/*
 	Reliability and Flow Control Example
 	From "Networking for Game Programmers" - http://www.gaffer.org/networking-for-game-programmers
 	Author: Glenn Fiedler <gaffer@gaffer.org>
@@ -13,6 +20,8 @@
 #include "Net.h"
 #define PACKET_SIZE 256
 //#define SHOW_ACKS
+
+#pragma warning (disable:4996)
 
 using namespace std;
 using namespace net;
@@ -117,14 +126,22 @@ private:
 
 // ----------------------------------------------
 
+/*
+* FUNCTION : sendFile
+* DESCRIPTION : Sends a file over a reliable connection.
+* PARAMETERS : ReliableConnection* connection - pointer to the connection object
+* RETURNS : void
+*/
+
 void sendFile(ReliableConnection* connection) 
 {
 	char filePath[256];
 	printf("Enter the filename to send: ");
 	scanf("%255s", filePath);
 
-	const char* openMode = "rb";
+	const char* openMode = "rb";// Ask if the file is binary or text
 
+	// Open the file
 	FILE* file = fopen(filePath, openMode);
 	if (!file) 
 	{
@@ -132,6 +149,7 @@ void sendFile(ReliableConnection* connection)
 		return;
 	}
 
+	// Get file size
 	fseek(file, 0, SEEK_END);
 	long fileSize = ftell(file);
 	rewind(file);
@@ -139,6 +157,7 @@ void sendFile(ReliableConnection* connection)
 	char* filename = filePath;
 	char* slash = NULL;
 
+	// Manually find the last '/' or '\' in the filePath
 	for (char* p = filePath; *p != '\0'; p++) 
 	{
 		if (*p == '/' || *p == '\\') {
@@ -158,6 +177,7 @@ void sendFile(ReliableConnection* connection)
 
 	printf("Sending filename: %s (Length: %d)\n", filename, filenameLength);
 
+	// Send Filename Packet (0x01)
 	unsigned char filenamePacket[256];
 	filenamePacket[0] = 0x01;
 	for (uint32_t i = 0; i < filenameLength; i++) 
@@ -167,6 +187,7 @@ void sendFile(ReliableConnection* connection)
 
 	connection->SendPacket(filenamePacket, filenameLength + 1);
 
+	// Send File Size Packet (0x02)
 	unsigned char sizePacket[9];
 	sizePacket[0] = 0x02; 
 	unsigned char* sizePtr = (unsigned char*)&fileSize;
@@ -177,6 +198,7 @@ void sendFile(ReliableConnection* connection)
 
 	connection->SendPacket(sizePacket, sizeof(sizePacket));
 
+	// Send File Mode Packet (0x05)
 	unsigned char modePacket[2];
 	modePacket[0] = 0x05; 
 	modePacket[1] = 1;
@@ -184,6 +206,7 @@ void sendFile(ReliableConnection* connection)
 
 	printf("Sending file: %s (%ld bytes)\n", filename, fileSize);
 
+	// Send File Content Packet (0x03)
 	char buffer[PACKET_SIZE];
 	size_t bytesRead;
 	while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0)
@@ -198,6 +221,7 @@ void sendFile(ReliableConnection* connection)
 	}
 	fclose(file);
 	
+	// Send End of File Packet (0x04)
 	unsigned char eofPacket[1] = { 0x04 };
 	connection->SendPacket(eofPacket, sizeof(eofPacket));
 
@@ -205,6 +229,13 @@ void sendFile(ReliableConnection* connection)
 
 	return;
 }
+
+/*
+* FUNCTION : receiveFile
+* DESCRIPTION : Receives a file from a reliable connection.
+* PARAMETERS : ReliableConnection* connection - pointer to the connection object
+* RETURNS : void
+*/
 
 void receiveFile(ReliableConnection* connection) 
 {
@@ -223,7 +254,7 @@ void receiveFile(ReliableConnection* connection)
 		int bytesRead = connection->ReceivePacket(packet, PACKET_SIZE);
 
 		if (bytesRead <= 0) continue;
-
+		//File Packets
 		if (packet[0] == 0x01) {
 			int dataLength = bytesRead - 1;
 
@@ -237,12 +268,13 @@ void receiveFile(ReliableConnection* connection)
 
 			printf("Received filename: %s (Length: %d)\n", filename, bytesRead - 1);
 
+			// Ensure filename is valid
 			for (uint32_t i = 0; i < bytesRead - 1; i++)
 			{
 				if (filename[i] < 32 || filename[i] > 126) filename[i] = '_';
 			}
 		}
-		else if (packet[0] == 0x02) 
+		else if (packet[0] == 0x02) // File Size Packet
 		{ 
 			expectedFileSize = 0;
 			int copyBytes = sizeof(expectedFileSize);
@@ -255,10 +287,11 @@ void receiveFile(ReliableConnection* connection)
 			}
 
 		}
-		else if (packet[0] == 0x05) 
+		else if (packet[0] == 0x05) // File Mode Packet
 		{ 
 			fileMode = packet[1];
 
+			// Open file in the correct mode
 			const char* openMode = (fileMode == 1) ? "wb" : "w";
 			file = fopen(filename, openMode);
 			if (!file)
@@ -269,7 +302,7 @@ void receiveFile(ReliableConnection* connection)
 			printf("Receiving file: %s (%lu bytes)\n", filename, expectedFileSize);
 			receiving = true;
 		}
-		else if (packet[0] == 0x03)
+		else if (packet[0] == 0x03) // File Content Packet
 		{
 			if (receiving && file) 
 			{
@@ -278,7 +311,7 @@ void receiveFile(ReliableConnection* connection)
 			}
 
 		}
-		else if (packet[0] == 0x04)
+		else if (packet[0] == 0x04) // End of File Packet
 		{
 			if (file) fclose(file);
 			printf("End of file received.\n");
@@ -296,6 +329,13 @@ void receiveFile(ReliableConnection* connection)
 
 	return;
 }
+
+/*
+* FUNCTION : calculateCRC32
+* DESCRIPTION : Computes the CRC-32 checksum for a given file.
+* PARAMETERS : const char* filePath - path to the file
+* RETURNS : uint32_t - computed CRC-32 checksum
+*/
 
 uint32_t calculateCRC32(const char* filePath)
 {
