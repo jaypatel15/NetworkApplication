@@ -287,6 +287,29 @@ void receiveFile(ReliableConnection* connection)
 	return;
 }
 
+uint32_t calculateCRC32(const char* filePath)
+{
+	ifstream file(filePath, ios::binary);
+	if (!file)
+	{
+		cerr << "Failed to open file: " << filePath << endl;
+		return 0;
+	}
+
+	int32_t crc = static_cast<int32_t>(0xFFFFFFFF);
+	char buffer[1024];
+	while (file.read(buffer, sizeof(buffer))) 
+	{
+		for (int i = 0; i < file.gcount(); ++i)
+		{
+			crc ^= buffer[i];
+			for (int j = 0; j < 8; ++j) {
+				crc = (crc >> 1) ^ ((crc & 1) ? 0xEDB88320 : 0);
+			}
+		}
+	}
+	return ~crc;
+}
 // ----------------------------------------------
 
 int main(int argc, char* argv[])
