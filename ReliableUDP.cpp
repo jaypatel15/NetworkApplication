@@ -8,7 +8,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
-
+#include<chrono>
 // Adding file header in the "ReliableUDP.cpp" file as #include "Net.h"
 #include "Net.h"
 #define PACKET_SIZE 256
@@ -215,6 +215,7 @@ void receiveFile(ReliableConnection* connection)
 	uint64_t expectedFileSize = 0, receivedFileSize = 0;
 	bool receiving = false;
 	unsigned char fileMode = 1;
+	auto startTime = std::chrono::high_resolution_clock::now();
 
 	while (true) 
 	{
@@ -284,6 +285,15 @@ void receiveFile(ReliableConnection* connection)
 			break;
 		}
 	}
+
+	auto endTime = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsedTime = endTime - startTime;
+
+	double transferSpeed = ((receivedFileSize * 8.0) / (elapsedTime.count() * 1'000'000));
+	printf("File received successfully: %s (%lu bytes)\n", filename, receivedFileSize);
+	printf("Transfer Time: %.6f seconds\n", elapsedTime.count());
+	printf("Transfer Speed: %.6f Mbit/s\n", transferSpeed);
+
 	return;
 }
 
