@@ -430,6 +430,7 @@ int main(int argc, char* argv[])
 
 		while (statsAccumulator >= 0.25f && connection.IsConnected())
 		{
+#ifdef SHOW_STATS
 			float rtt = connection.GetReliabilitySystem().GetRoundTripTime();
 
 			unsigned int sent_packets = connection.GetReliabilitySystem().GetSentPackets();
@@ -444,6 +445,7 @@ int main(int argc, char* argv[])
 				sent_packets > 0.0f ? (float)lost_packets / (float)sent_packets * 100.0f : 0.0f,
 				sent_bandwidth, acked_bandwidth);
 
+#endif
 			statsAccumulator -= 0.25f;
 		}
 
